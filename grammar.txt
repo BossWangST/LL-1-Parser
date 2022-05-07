@@ -1,0 +1,160 @@
+AUTO  0
+ELSE  1
+LONG  2
+SWITCH  3
+BREAK  4
+ENUM  5
+REGISTER  6
+TYPEDEF  7
+CASE  8
+EXTERN  9
+RETURN  10
+UNION  11
+CHAR  12
+FLOAT  13
+SHORT  14
+UNSIGNED  15
+CONST  16
+FOR  17
+SIGNED  18
+VOID  19
+CONTINUE  20
+GOTO  21
+SIZEOF  22
+VOLATILE  23
+DEFAULT  24
+IF  25
+STATIC  26
+WHILE  27
+DOUBLE  28
+INT  29
+STRUCT  30
+_PACKED  31
+DO  32
+ID  100
+INT_NUM  200
+REAL_NUM  201
+STRING_LITERAL  202
+CHAR_LITERAL  203
+RELOP  300
+LT  0
+LE  1
+EQ  2
+NE  3
+GT  4
+GE  5
+ARILOP  301
+PLUS  0
+MINUS  1
+MULTIPLY  2
+DIVIDE  3
+MOD  4
+LOGOP  302
+AND  0
+OR  1
+NOT  2
+BITOP  303
+LSHIFT  0
+RSHIFT  1
+BITAND  2
+BITOR  3
+BITNOT  4
+BITXOR  5
+ASSIGNOP  304
+ASSIGN  1
+ADDASSIGN  2
+MINUSASSIGN  3
+MULTIPLYASSIGN  4
+DIVIDEASSIGN  5
+MODASSIGN  6
+ANDASSIGN  7
+ORASSIGN  8
+XORASSIGN  10
+LSHIFTASSIGN  11
+RSHIFTASSIGN  12
+PUNCTUATION  400
+LP  0
+RP  1
+LSBR  2
+RSBR  3
+LBR  4
+RBR  5
+COMMA  6
+SEMICOLON  7
+MACRO  8
+DOT  9
+COLON  10
+
+%% Here is the rules
+# a rule consists of a head and a body.
+# like this: {A}    {0,B}{1,int}...
+# 0 - Non-Terminals    1 - Terminals, which is a token  -1 - Empty
+# if {{...}}, it means repetition (EBNF)
+# $ means OR
+# {[...]} means optional
+# program -> declaration_list
+{program}    {0,declaration_list}
+# declaration_list -> declaration{declaration}
+{declaration_list}    {0,declaration}{{ {0,declaration} }}
+# declaration -> variable_declaration | function_declaration
+{declaration}    {0,variable_declaration}${0,function_declaration}
+# variable_declaration -> type_specifier ID [ "[" INT_NUM "]" ]
+{variable_declaration}    {0,type_specifier}{1,ID}{[ {1,PUNCTUATION,LSBR}{1,INT_NUM}{1,PUNCTUATION,RSBR} ]}
+# type_specifier -> INT | VOID | struct_specifier
+{type_specifier}    {1,INT}${1,VOID}${0,struct_specifier}
+# struct_specifier -> STRUCT [ID] [ { struct_declaration_list } ]
+{struct_specifier}    {1,STRUCT}{[ {0,ID} ]}{[ {{ {0,struct_declaration_list} }} ]}
+# struct_declaration_list -> INT ID SEMICOLON { INT ID SEMICOLON }
+{struct_declaration_list}    {1,INT}{1,ID}{1,PUNCTUATION,SEMICOLON}{{ {1,INT}{1,ID}{1,PUNCTUATION,SEMICOLON} }}
+# function_declaration -> type_specifier ID LP parameters RP compound_statement
+{function_declaration}    {0,type_specifier}{1,ID}{1,PUNCTUATION,LP}{0,parameters}{1,PUNCTUATION,RP}{0,compound_statement}
+# parameters -> parameter_list | VOID
+{parameters}    {0,parameter_list}${1,VOID}
+# parameter_list -> parameter { COMMA parameter }
+{parameter_list}    {0,parameter}{{ {1,COMMA}{0,parameter} }}
+# parameter -> type_specifier ID [ "[" "]" ]
+{parameter}    {0,type_specifier}{1,ID}{[{1,PUNCTUATION,LSBR}{1,PUNCTUATION,RSBR}]}
+# compound_statement -> { [local_declaration] [statement_list] }
+{compound_statement}    {{ {[ {0,local_declarations} ]}{[ {0,statement_list} ]} }}
+# local_declarations -> {variable_declaration}
+{local_declarations}    {{ {0,variable_declaration} }}
+# statement_list -> {statement}
+{statement_list}    {{ {0,statement} }}
+# statement -> compound_statement | expression_statement | selection_statement | labeled_statement | iteration_statement | jump_statement
+{statement}    {0,compound_statement}${0,expression_statement}${0,selection_statement}${0,labeled_statement}${0,iteration_statement}${0,jump_statement}
+# expression_statement -> [expression];
+{expression_statement}    {[ {0,expression} ]}{1,PUNCTUATION,SEMICOLON}
+# selection_statement -> if(expression) statement [else statement] | switch(expression) statement
+{selection_statement}    {1,IF}{1,PUNCTUATION,LP}{0,expression}{1,PUNCTUATION,RP}{0,statement}{[ {1,ELSE}{0,statement} ]}${1,SWITCH}{1,PUNCTUATION,LP}{0,expression}{1,PUNCTUATION,RP}{0,statement}
+# iteration_statement -> while(expression) statement|for([expression];[expression];[expression]) statement
+{iteration_statement}    {1,WHILE}{1,PUNCTUATION,LP}{0,expression}{1,PUNCTUATION,RP}{0,statement}${1,FOR}{1,PUNCTUATION,LP}{[ {0,expression} ]}{1,PUNCTUATION,SEMICOLON}{[ {0,expression} ]}{1,PUNCTUATION,SEMICOLON}{[ {0,expression} ]}{1,PUNCTUATION,RP}{0,statement}
+# jump_statement -> return [expression];|break;|goto ID;
+{jump_statement}    {1,RETURN}{[ {0,expression} ]}{1,PUNCTUATION,SEMICOLON}${1,BREAK}{1,PUNCTUATION,SEMICOLON}${1,GOTO}{1,PUNCTUATION,SEMICOLON}
+# labeled_statement -> ID:statement | case conditional_expression : statement | default : statement
+{labeled_statement}    {1,ID}{1,PUNCTUATION,COLON}{0,statement}${1,CASE}{1,conditional_expression}{1,PUNCTUATION,COLON}{0,statement}${1,DEFAULT}{1,PUNCTUATION,COLON}{0,statement}
+# expression -> assignment_expression | conditional_expression
+{expression}    {0,assignment_expression}${0,conditional_expression}
+# assignment_expression -> variable = expression
+{assignment_expression}    {0,variable}{1,ASSIGNOP,ASSIGN}{0,expression}
+# variable -> ID | ID [ NUM ] | ID.ID
+{variable}    {1,ID}${1,ID}{1,PUNCTUATION,LSBR}{1,NUM}{1,PUNCTUATION,RSBR}${1,ID}{1,DOT}{1,ID}
+# conditional_expression -> additive_expression | additive_expression relational_operator additive_expression
+{conditional_expression}    {0,additive_expression}${0,additive_expression}{0,relational_operator}{0,additive_expression}
+# relational_operator -> <= | < | > | >= | != | ==
+{relational_operator}    {1,RELOP,LE}${1,RELOP,LT}${1,RELOP,GT}${1,RELOP,GE}${1,RELOP,EQ}${1,RELOP,NE}
+# additive_expression -> multiplicative_expression | additive_expression add_operator multiplicative_expression
+{additive_expression}    {0,multiplicative_expression}${0,additive_expression}{0,add_operator}{0,multiplicative_expression}
+# add_operator -> + | -
+{add_operator}    {1,ARIOP,PLUS}${1,ARIOP,MINUS}
+# multiplicative_expression -> primary_expression | multiplicative_expression mul_operator primary_expression
+{multiplicative_expression}    {0,primary_expression}${0,multiplicative_expression}{0,mul_operator}{0,primary_expression}
+# mul_operator -> * | /
+{mul_operator}    {1,ARIOP,MULTIPLY}${1,ARIOP,DIVIDE}
+# primary_expression -> variable | NUM | (expression) | call_function
+{primary_expression}    {0,variable}${1,NUM}${1,PUNCTUATION,LP}{0,expression}{1,PUNCTUATION,RP}${0,call_function}
+# call_function -> ID(arguments)
+{call_function}    {1,ID}{1,PUNCTUATION,LP}{0,arguments}{1,PUNCTUATION,RP}
+# arguments -> argument_list | e
+{arguments}    {0,argument_list}${-1}
+# argument_list -> argument_list , expression | expression
+{argument_list}    {0,argument_list}{1,PUNCTUATION,COMMA}{0,expression}${0,expression}
