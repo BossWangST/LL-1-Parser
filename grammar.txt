@@ -43,7 +43,7 @@ EQ  2
 NE  3
 GT  4
 GE  5
-ARILOP  301
+ARIOP  301
 PLUS  0
 MINUS  1
 MULTIPLY  2
@@ -131,13 +131,13 @@ COLON  10
 # jump_statement -> return [expression];|break;|goto ID;
 {jump_statement}    {1,RETURN}{[ {0,expression} ]}{1,PUNCTUATION,SEMICOLON}${1,BREAK}{1,PUNCTUATION,SEMICOLON}${1,GOTO}{1,PUNCTUATION,SEMICOLON}
 # labeled_statement -> ID:statement | case conditional_expression : statement | default : statement
-{labeled_statement}    {1,ID}{1,PUNCTUATION,COLON}{0,statement}${1,CASE}{1,conditional_expression}{1,PUNCTUATION,COLON}{0,statement}${1,DEFAULT}{1,PUNCTUATION,COLON}{0,statement}
+{labeled_statement}    {1,ID}{1,PUNCTUATION,COLON}{0,statement}${1,CASE}{0,conditional_expression}{1,PUNCTUATION,COLON}{0,statement}${1,DEFAULT}{1,PUNCTUATION,COLON}{0,statement}
 # expression -> assignment_expression | conditional_expression
 {expression}    {0,assignment_expression}${0,conditional_expression}
 # assignment_expression -> variable = expression
 {assignment_expression}    {0,variable}{1,ASSIGNOP,ASSIGN}{0,expression}
 # variable -> ID | ID [ NUM ] | ID.ID
-{variable}    {1,ID}${1,ID}{1,PUNCTUATION,LSBR}{1,NUM}{1,PUNCTUATION,RSBR}${1,ID}{1,DOT}{1,ID}
+{variable}    {1,ID}${1,ID}{1,PUNCTUATION,LSBR}{1,INT_NUM}{1,PUNCTUATION,RSBR}${1,ID}{1,DOT}{1,ID}
 # conditional_expression -> additive_expression | additive_expression relational_operator additive_expression
 {conditional_expression}    {0,additive_expression}${0,additive_expression}{0,relational_operator}{0,additive_expression}
 # relational_operator -> <= | < | > | >= | != | ==
@@ -151,7 +151,7 @@ COLON  10
 # mul_operator -> * | /
 {mul_operator}    {1,ARIOP,MULTIPLY}${1,ARIOP,DIVIDE}
 # primary_expression -> variable | NUM | (expression) | call_function
-{primary_expression}    {0,variable}${1,NUM}${1,PUNCTUATION,LP}{0,expression}{1,PUNCTUATION,RP}${0,call_function}
+{primary_expression}    {0,variable}${1,INT_NUM}${1,REAL_NUM}{1,PUNCTUATION,LP}{0,expression}{1,PUNCTUATION,RP}${0,call_function}
 # call_function -> ID(arguments)
 {call_function}    {1,ID}{1,PUNCTUATION,LP}{0,arguments}{1,PUNCTUATION,RP}
 # arguments -> argument_list | e
