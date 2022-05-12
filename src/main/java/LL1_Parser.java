@@ -162,7 +162,25 @@ public class LL1_Parser {
                     current_first.add(r.body.get(0).Terminal);
                 }
             } else if (r.body.get(0).type == 0) {
-                var needed_first = get_single_first(r.body.get(0).non_Terminal_name, Non_Terminal_first);
+                HashSet<Integer> needed_first;
+                if (this.first.containsKey(r.body.get(0).non_Terminal_name))
+                    needed_first = this.first.get(r.body.get(0).non_Terminal_name);
+                else
+                    needed_first = get_single_first(r.body.get(0).non_Terminal_name, Non_Terminal_first);
+                if (needed_first.contains(-1)) {
+                    int index = 1;
+                    while (needed_first.contains(-1)) {
+                        needed_first.remove(-1);
+                        HashSet<Integer> needed_next;
+                        if (this.first.containsKey(r.body.get(index).non_Terminal_name))
+                            needed_next = this.first.get(r.body.get(index++).non_Terminal_name);
+                        else
+                            needed_next = get_single_first(r.body.get(index++).non_Terminal_name, Non_Terminal_first);
+                        needed_first.addAll(needed_next);
+                        if (index == r.body.size() - 1)
+                            break;
+                    }
+                }
                 current_first.addAll(needed_first);
             } else {
                 current_first.add(-1);
@@ -184,18 +202,20 @@ public class LL1_Parser {
 
     ArrayList<String> Non_Terminals;
 
-    HashSet<Integer> get_single_follow(String current_rule_head, String head, rule ru, HashSet<String> Non_Terminal_follow) {
+    HashSet<Integer> get_single_follow(String current_rule_head, String head, rule ru, HashSet<String> Non_Terminal_follow, Boolean start_Non_Terminal) {
         Non_Terminal_follow.add(head);
         var current_follow = new HashSet<Integer>();
         var symbols = ru.body;
         for (int i = 0; i < symbols.size(); i++) {
+            if (symbols.get(i).non_Terminal_name == null)//this is a Terminal
+                continue;
             if (symbols.get(i).non_Terminal_name.equals(head)) {
-                if (i == symbols.size()) {//the Non-Terminal is in the end of the body
+                if (i == symbols.size() - 1) {//the Non-Terminal is in the end of the body
                     if (!Non_Terminal_follow.contains(current_rule_head)) {
                         for (String find_head : this.Non_Terminals) {
                             for (rule find_ru : rules.get(find_head)) {
                                 if (find_ru.contained_Non_Terminals.contains(current_rule_head)) {
-                                    get_single_follow(find_head, current_rule_head, find_ru, Non_Terminal_follow);
+                                    get_single_follow(find_head, current_rule_head, find_ru, Non_Terminal_follow, start_Non_Terminal);
                                 }
                             }
                         }
@@ -209,23 +229,27 @@ public class LL1_Parser {
                         } else {
                             current_follow.add(symbols.get(i + 1).Terminal);
                         }
+                        break;
                     } else {//if next symbol is Non-Terminal
                         HashSet<Integer> needed_first = new HashSet<Integer>();
                         needed_first.addAll(this.first.get(symbols.get(i + 1).non_Terminal_name));
                         int index = 2;
-                        while (needed_first.contains(-1)) {//if first(next non-terminal) has -1, then recursively add first set
-                            needed_first.remove(-1);
-                            current_follow.addAll(needed_first);
-                            if (i + index < symbols.size()) {
-                                needed_first = new HashSet<Integer>();
-                                needed_first.addAll(this.first.get(symbols.get(i + index).non_Terminal_name));
-                            } else {
-                                break;
+                        if (needed_first.contains(-1)) {//if first(next non-terminal) has -1, then recursively add first set
+                            while (needed_first.contains(-1)) {
+                                needed_first.remove(-1);
+                                current_follow.addAll(needed_first);
+                                if (i + index < symbols.size()) {
+                                    needed_first = new HashSet<Integer>();
+                                    needed_first.addAll(this.first.get(symbols.get(i + index).non_Terminal_name));
+                                } else {
+                                    break;
+                                }
+                                index++;
                             }
-                            index++;
+                            if (needed_first.contains(-1)) current_follow.add(-1);
+                        } else {
+                            current_follow.addAll(needed_first);//or just add the first set to this follow set
                         }
-                        if (needed_first.contains(-1))
-                            current_follow.add(-1);
                     }
                 }
             }
@@ -237,18 +261,23 @@ public class LL1_Parser {
 
     void get_follow_set() {
         var Non_Terminal_follow = new HashSet<String>();
+        Boolean start_Non_Terminal = true;
         for (String head : this.Non_Terminals) {
-            if (Non_Terminal_follow.contains(head))
-                continue;
+            if (Non_Terminal_follow.contains(head)) continue;
             for (String r : this.Non_Terminals) {
                 for (rule ru : rules.get(r)) {
                     if (ru.contained_Non_Terminals.contains(head)) {
                         //check all the body of rules containing this Non-Terminal
-                        get_single_follow(r, head, ru, Non_Terminal_follow);
+                        var current_follow = get_single_follow(r, head, ru, Non_Terminal_follow, start_Non_Terminal);
+                        if (start_Non_Terminal) {
+                            current_follow.add(-2);//start and end separator of a string
+                            start_Non_Terminal = false;
+                        }
                     }
                 }
             }
         }
+
     }
 
     public LL1_Parser(BufferedReader reader, Lexical_Analysis lexical) throws IOException {
@@ -291,7 +320,7 @@ public class LL1_Parser {
             var lexical = new Lexical_Analysis(lex_reader);
             var token_sequence = lexical.scanner();
             System.out.println(token_sequence.toString());
-            var grammar_reader = new BufferedReader(new InputStreamReader(new FileInputStream("grammar2.txt")));
+            var grammar_reader = new BufferedReader(new InputStreamReader(new FileInputStream("grammar3.txt")));
             var parser = new LL1_Parser(grammar_reader, lexical);
         } catch (IOException e) {
             e.printStackTrace();
