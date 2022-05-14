@@ -57,6 +57,7 @@ public class LL1_Parser {
     BufferedReader reader;
     HashMap<String, HashSet<Integer>> first;
     HashMap<String, HashSet<Integer>> follow;
+    HashMap<String, HashMap<Integer, Integer>> parser_table;
 
 
     void insert_single_symbol(String r, ArrayList<symbol> current_body, HashSet<String> current_Non_Terminals, int feature) {
@@ -162,20 +163,20 @@ public class LL1_Parser {
                     current_first.add(r.body.get(0).Terminal);
                 }
             } else if (r.body.get(0).type == 0) {
-                HashSet<Integer> needed_first;
+                var needed_first = new HashSet<Integer>();
                 if (this.first.containsKey(r.body.get(0).non_Terminal_name))
-                    needed_first = this.first.get(r.body.get(0).non_Terminal_name);
+                    needed_first.addAll(this.first.get(r.body.get(0).non_Terminal_name));
                 else
-                    needed_first = get_single_first(r.body.get(0).non_Terminal_name, Non_Terminal_first);
+                    needed_first.addAll(get_single_first(r.body.get(0).non_Terminal_name, Non_Terminal_first));
                 if (needed_first.contains(-1)) {
                     int index = 1;
                     while (needed_first.contains(-1)) {
                         needed_first.remove(-1);
-                        HashSet<Integer> needed_next;
+                        HashSet<Integer> needed_next = new HashSet<>();
                         if (this.first.containsKey(r.body.get(index).non_Terminal_name))
-                            needed_next = this.first.get(r.body.get(index++).non_Terminal_name);
+                            needed_next.addAll(this.first.get(r.body.get(index++).non_Terminal_name));
                         else
-                            needed_next = get_single_first(r.body.get(index++).non_Terminal_name, Non_Terminal_first);
+                            needed_next.addAll(get_single_first(r.body.get(index++).non_Terminal_name, Non_Terminal_first));
                         needed_first.addAll(needed_next);
                         if (index == r.body.size() - 1)
                             break;
@@ -255,7 +256,6 @@ public class LL1_Parser {
             }
         }
         this.follow.put(head, current_follow);
-        System.out.println("Follow(" + head + ")=" + this.follow.get(head).toString());
         return current_follow;
     }
 
@@ -273,11 +273,56 @@ public class LL1_Parser {
                             current_follow.add(-2);//start and end separator of a string
                             start_Non_Terminal = false;
                         }
+                        System.out.println("Follow(" + head + ")=" + this.follow.get(head).toString());
                     }
                 }
             }
         }
 
+    }
+
+    void get_parser_table() {
+        //check all the rules of each Non-Terminal. Calculate SELECT set.
+        for (String VN : this.Non_Terminals) {
+            var current_select = new HashMap<Integer, Integer>();
+            for (int i = 0; i < this.rules.get(VN).length; i++) {
+                var r = this.rules.get(VN)[i];
+                if (r.body.get(0).type == 1) {//this body begins with Terminal.
+                    if (r.body.get(0).further_feature != -1) {
+                        //if the next token is here the body's select, then choose i th rule to derivate
+                        current_select.put(r.body.get(0).further_feature + r.body.get(0).Terminal, i);
+                    } else {
+                        current_select.put(r.body.get(0).Terminal, i);
+                    }
+                } else if (r.body.get(0).type == 0) {// this body begins with non-Terminal.
+                    var current_first = new HashSet<Integer>();
+                    current_first.addAll(this.first.get(r.body.get(0).non_Terminal_name));
+                    if (current_first.contains(-1)) {
+                        HashSet<Integer> next_first = new HashSet<>();
+                        int index = 1;
+                        while (current_first.contains(-1)) {
+                            current_first.remove(-1);
+                            next_first.addAll(this.first.get(r.body.get(index++).non_Terminal_name));
+                            current_first.addAll(next_first);
+                            if (index == this.rules.get(VN).length - 1) {
+                                break;
+                            }
+                        }
+                        if (current_first.contains(-1))
+                            current_first.addAll(this.follow.get(VN));
+                    }
+                    for (int t : current_first)
+                        current_select.put(t, i);
+                } else {// this body is empty(-1)
+                    var current_follow = new HashSet<Integer>();
+                    current_follow.addAll(this.follow.get(VN));
+                    for (int t : current_follow)
+                        current_select.put(t, i);
+                }
+            }
+            this.parser_table.put(VN, current_select);
+            System.out.println("SELECT(" + VN + ")=" + current_select.toString());
+        }
     }
 
     public LL1_Parser(BufferedReader reader, Lexical_Analysis lexical) throws IOException {
@@ -312,6 +357,8 @@ public class LL1_Parser {
         get_first_set();
         this.follow = new HashMap<>();
         get_follow_set();
+        this.parser_table = new HashMap<>();
+        get_parser_table();
     }
 
     public static void main(String[] args) {
@@ -320,7 +367,7 @@ public class LL1_Parser {
             var lexical = new Lexical_Analysis(lex_reader);
             var token_sequence = lexical.scanner();
             System.out.println(token_sequence.toString());
-            var grammar_reader = new BufferedReader(new InputStreamReader(new FileInputStream("grammar3.txt")));
+            var grammar_reader = new BufferedReader(new InputStreamReader(new FileInputStream("grammar2.txt")));
             var parser = new LL1_Parser(grammar_reader, lexical);
         } catch (IOException e) {
             e.printStackTrace();
