@@ -2,10 +2,7 @@ import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedList;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -361,14 +358,68 @@ public class LL1_Parser {
         get_parser_table();
     }
 
+    void parse(Token_Sequence token_sequence) {
+        var tokens = token_sequence.tokens;
+        var stack = new Stack<symbol>();
+        stack.push(new symbol(-2, 0));
+        stack.push(new symbol(0, 0, "additive_expression"));
+        //init the stack: $ Start_Symbol
+        int next = 0;
+        while (stack.size() != 1) {
+            var t = tokens.get(next);
+            int type;
+            if (t instanceof op_token)
+                type = t.type + ((op_token) t).value;
+            else
+                type = t.type;
+            if (stack.peek().type == 0) {//if top is Non-Terminal
+                var current_peek = stack.pop();
+                int feature = current_peek.feature;
+                var map = this.parser_table.get(current_peek.non_Terminal_name);
+                //0 <-> normal  1 <-> repeated  2 <-> optional  !3 <-> optional but repeated(only one)  !4 <-> repeated but optional(only one)
+                if ((!map.containsKey(type))) {// && (feature != 2 || feature != 3)) {
+                    throw new IllegalStateException("Failed to parse! This string is not in the grammar's language!");
+                }
+                int rule_index = map.get(type);
+                rule[] r = this.rules.get(current_peek.non_Terminal_name);
+                var body = r[rule_index].body;
+                for (int i = body.size() - 1; i >= 0; i--)
+                    stack.push(body.get(i));
+                //if (feature == 1 || feature == 4)
+                //    stack.push(current_peek);
+            } else if (stack.peek().type == 1) {//if top is Terminal
+                var current_peek = stack.pop();
+                if (current_peek.further_feature != -1) {
+                    if (current_peek.type + current_peek.further_feature == type) {
+                        next++;
+                    } else {
+                        throw new IllegalStateException("Failed to parse! This string is not in the grammar's language!");
+                    }
+                } else {
+                    if (current_peek.type == type) {
+                        next++;
+                    } else {
+                        throw new IllegalStateException("Failed to parse! This string is not in the grammar's language!");
+                    }
+                }
+            } else {//if top is $
+                if (next == tokens.size()) {
+                    System.out.println("Success!");
+                } else
+                    throw new IllegalStateException("Failed to parse! This string is not in the grammar's language!");
+            }
+        }
+    }
+
     public static void main(String[] args) {
         try {
-            var lex_reader = new BufferedReader(new InputStreamReader(new FileInputStream("test.c")));
+            var lex_reader = new BufferedReader(new InputStreamReader(new FileInputStream("./test_case/test_add.c")));
             var lexical = new Lexical_Analysis(lex_reader);
             var token_sequence = lexical.scanner();
             System.out.println(token_sequence.toString());
             var grammar_reader = new BufferedReader(new InputStreamReader(new FileInputStream("grammar2.txt")));
             var parser = new LL1_Parser(grammar_reader, lexical);
+            parser.parse(token_sequence);
         } catch (IOException e) {
             e.printStackTrace();
         } catch (ClassNotFoundException e) {
