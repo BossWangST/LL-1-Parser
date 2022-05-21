@@ -252,7 +252,6 @@ public class LL1_Parser {
                 }
             }
         }
-        this.follow.put(head, current_follow);
         return current_follow;
     }
 
@@ -261,19 +260,29 @@ public class LL1_Parser {
         Boolean start_Non_Terminal = true;
         for (String head : this.Non_Terminals) {
             if (Non_Terminal_follow.contains(head)) continue;
+            if (start_Non_Terminal) {
+                var start_follow = new HashSet<Integer>();
+                start_follow.add(-2);
+                this.start_Non_Terminal_name = head;
+                this.follow.put(head, start_follow);
+            }
             for (String r : this.Non_Terminals) {
                 for (rule ru : rules.get(r)) {
                     if (ru.contained_Non_Terminals.contains(head)) {
                         //check all the body of rules containing this Non-Terminal
                         var current_follow = get_single_follow(r, head, ru, Non_Terminal_follow, start_Non_Terminal);
                         if (start_Non_Terminal) {
-                            current_follow.add(-2);//start and end separator of a string
+                            this.follow.get(head).addAll(current_follow);
                             start_Non_Terminal = false;
+                        } else if (this.follow.containsKey(head)) {
+                            this.follow.get(head).addAll(current_follow);
+                        } else {
+                            this.follow.put(head, current_follow);
                         }
-                        System.out.println("Follow(" + head + ")=" + this.follow.get(head).toString());
                     }
                 }
             }
+            System.out.println("Follow(" + head + ")=" + this.follow.get(head).toString());
         }
 
     }
@@ -322,11 +331,14 @@ public class LL1_Parser {
         }
     }
 
+    String start_Non_Terminal_name;
+
     public LL1_Parser(BufferedReader reader, Lexical_Analysis lexical) throws IOException {
         this.reader = reader;
         this.token_id = new HashMap<>();
         this.rules = new HashMap<>();
         this.Non_Terminals = new ArrayList<>();
+
         String current_line = "";
         int flag = 0;
         while (true) {
@@ -362,11 +374,15 @@ public class LL1_Parser {
         var tokens = token_sequence.tokens;
         var stack = new Stack<symbol>();
         stack.push(new symbol(-2, 0));
-        stack.push(new symbol(0, 0, "additive_expression"));
+        stack.push(new symbol(0, 0, this.start_Non_Terminal_name));
         //init the stack: $ Start_Symbol
         int next = 0;
         while (stack.size() != 1) {
-            var t = tokens.get(next);
+            token t;
+            if (next == tokens.size())
+                t = new token(-1, -1);
+            else
+                t = tokens.get(next);
             int type;
             if (t instanceof op_token)
                 type = t.type + ((op_token) t).value;
@@ -374,6 +390,8 @@ public class LL1_Parser {
                 type = t.type;
             if (stack.peek().type == 0) {//if top is Non-Terminal
                 var current_peek = stack.pop();
+                if (type == -1)
+                    continue;
                 int feature = current_peek.feature;
                 var map = this.parser_table.get(current_peek.non_Terminal_name);
                 //0 <-> normal  1 <-> repeated  2 <-> optional  !3 <-> optional but repeated(only one)  !4 <-> repeated but optional(only one)
@@ -383,20 +401,24 @@ public class LL1_Parser {
                 int rule_index = map.get(type);
                 rule[] r = this.rules.get(current_peek.non_Terminal_name);
                 var body = r[rule_index].body;
-                for (int i = body.size() - 1; i >= 0; i--)
+                for (int i = body.size() - 1; i >= 0; i--) {
+                    var p = body.get(i);
+                    if (p.type == -1)
+                        continue;
                     stack.push(body.get(i));
+                }
                 //if (feature == 1 || feature == 4)
                 //    stack.push(current_peek);
             } else if (stack.peek().type == 1) {//if top is Terminal
                 var current_peek = stack.pop();
                 if (current_peek.further_feature != -1) {
-                    if (current_peek.type + current_peek.further_feature == type) {
+                    if (current_peek.Terminal + current_peek.further_feature == type) {
                         next++;
                     } else {
                         throw new IllegalStateException("Failed to parse! This string is not in the grammar's language!");
                     }
                 } else {
-                    if (current_peek.type == type) {
+                    if (current_peek.Terminal == type) {
                         next++;
                     } else {
                         throw new IllegalStateException("Failed to parse! This string is not in the grammar's language!");
@@ -420,6 +442,7 @@ public class LL1_Parser {
             var grammar_reader = new BufferedReader(new InputStreamReader(new FileInputStream("grammar2.txt")));
             var parser = new LL1_Parser(grammar_reader, lexical);
             parser.parse(token_sequence);
+            System.out.println("Parse Success!");
         } catch (IOException e) {
             e.printStackTrace();
         } catch (ClassNotFoundException e) {
