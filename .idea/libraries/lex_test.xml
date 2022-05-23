@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="lex_test">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/../lex/lex_test/out/artifacts/lex_test_jar/lex_test.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

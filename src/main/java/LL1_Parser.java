@@ -209,17 +209,7 @@ public class LL1_Parser {
                 continue;
             if (symbols.get(i).non_Terminal_name.equals(head)) {
                 if (i == symbols.size() - 1) {//the Non-Terminal is in the end of the body
-                    if (!Non_Terminal_follow.contains(current_rule_head)) {
-                        for (String find_head : this.Non_Terminals) {
-                            for (rule find_ru : rules.get(find_head)) {
-                                if (find_ru.contained_Non_Terminals.contains(current_rule_head)) {
-                                    get_single_follow(find_head, current_rule_head, find_ru, Non_Terminal_follow, start_Non_Terminal);
-                                }
-                            }
-                        }
-                    }
-                    HashSet<Integer> needed_follow = follow.get(current_rule_head);
-                    current_follow.addAll(needed_follow);
+                    get_needed_follow(current_rule_head, Non_Terminal_follow, start_Non_Terminal, current_follow);
                 } else {
                     if (symbols.get(i + 1).type == 1) {//if next symbol is Terminal
                         if (symbols.get(i + 1).further_feature != -1) {
@@ -234,7 +224,6 @@ public class LL1_Parser {
                         int index = 2;
                         if (needed_first.contains(-1)) {//if first(next non-terminal) has -1, then recursively add first set
                             while (needed_first.contains(-1)) {
-                                needed_first.remove(-1);
                                 current_follow.addAll(needed_first);
                                 if (i + index < symbols.size()) {
                                     needed_first = new HashSet<Integer>();
@@ -244,7 +233,10 @@ public class LL1_Parser {
                                 }
                                 index++;
                             }
-                            if (needed_first.contains(-1)) current_follow.add(-1);
+                            if (needed_first.contains(-1)) {
+                                current_follow.remove(-1);
+                                get_needed_follow(current_rule_head, Non_Terminal_follow, start_Non_Terminal, current_follow);
+                            }
                         } else {
                             current_follow.addAll(needed_first);//or just add the first set to this follow set
                         }
@@ -253,6 +245,20 @@ public class LL1_Parser {
             }
         }
         return current_follow;
+    }
+
+    private void get_needed_follow(String current_rule_head, HashSet<String> Non_Terminal_follow, Boolean start_Non_Terminal, HashSet<Integer> current_follow) {
+        if (!Non_Terminal_follow.contains(current_rule_head)) {
+            for (String find_head : this.Non_Terminals) {
+                for (rule find_ru : rules.get(find_head)) {
+                    if (find_ru.contained_Non_Terminals.contains(current_rule_head)) {
+                        get_single_follow(find_head, current_rule_head, find_ru, Non_Terminal_follow, start_Non_Terminal);
+                    }
+                }
+            }
+        }
+        HashSet<Integer> needed_follow = follow.get(current_rule_head);
+        current_follow.addAll(needed_follow);
     }
 
     void get_follow_set() {
@@ -377,10 +383,12 @@ public class LL1_Parser {
         stack.push(new symbol(0, 0, this.start_Non_Terminal_name));
         //init the stack: $ Start_Symbol
         int next = 0;
+        int turn = 0;//just for debug
         while (stack.size() != 1) {
+            turn++;
             token t;
             if (next == tokens.size())
-                t = new token(-1, -1);
+                t = new token(-1, tokens.get(tokens.size() - 1).line);
             else
                 t = tokens.get(next);
             int type;
@@ -396,7 +404,7 @@ public class LL1_Parser {
                 var map = this.parser_table.get(current_peek.non_Terminal_name);
                 //0 <-> normal  1 <-> repeated  2 <-> optional  !3 <-> optional but repeated(only one)  !4 <-> repeated but optional(only one)
                 if ((!map.containsKey(type))) {// && (feature != 2 || feature != 3)) {
-                    throw new IllegalStateException("Failed to parse! This string is not in the grammar's language!");
+                    throw new IllegalArgumentException("Failed to parse at LINE " + t.line + " This string is not in the grammar's language!");
                 }
                 int rule_index = map.get(type);
                 rule[] r = this.rules.get(current_peek.non_Terminal_name);
@@ -415,20 +423,20 @@ public class LL1_Parser {
                     if (current_peek.Terminal + current_peek.further_feature == type) {
                         next++;
                     } else {
-                        throw new IllegalStateException("Failed to parse! This string is not in the grammar's language!");
+                        throw new IllegalArgumentException("Failed to parse at LINE " + t.line + " This string is not in the grammar's language!");
                     }
                 } else {
                     if (current_peek.Terminal == type) {
                         next++;
                     } else {
-                        throw new IllegalStateException("Failed to parse! This string is not in the grammar's language!");
+                        throw new IllegalArgumentException("Failed to parse at LINE " + t.line + " This string is not in the grammar's language!");
                     }
                 }
             } else {//if top is $
                 if (next == tokens.size()) {
                     System.out.println("Success!");
                 } else
-                    throw new IllegalStateException("Failed to parse! This string is not in the grammar's language!");
+                    throw new IllegalArgumentException("Failed to parse at LINE " + t.line + " This string is not in the grammar's language!");
             }
         }
     }
@@ -447,6 +455,8 @@ public class LL1_Parser {
             e.printStackTrace();
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
+        } catch (RuntimeException e) {
+            System.out.println(e.getMessage());
         }
     }
 }
